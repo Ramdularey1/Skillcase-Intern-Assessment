@@ -25,6 +25,12 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/health/db", async (_req, res) => {
+  const { query } = await import("./config/db.js");
+  const { rows } = await query("select now() as checked_at");
+  res.json({ status: "ok", checked_at: rows[0].checked_at });
+});
+
 app.use("/auth", authRoutes);
 app.use("/videos", videoRoutes);
 app.use(notFoundHandler);
