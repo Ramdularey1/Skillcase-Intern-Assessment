@@ -1,4 +1,4 @@
-import { LogIn, LogOut, Plus } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
@@ -11,22 +11,62 @@ export function FeedPage() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const feedTrackRef = useRef(null);
+  const accountMenuRef = useRef(null);
   const [videos, setVideos] = useState([]);
   const [activeComments, setActiveComments] = useState(null);
-  const [audioMuted, setAudioMuted] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [audioMuted, setAudioMuted] = useState(true);
   const [activeVideoId, setActiveVideoId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api
-      .get("/videos")
-      .then(({ data }) => {
+    function handleDocumentPointerDown(event) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target)) {
+        setAccountOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handleDocumentPointerDown);
+    return () => document.removeEventListener("pointerdown", handleDocumentPointerDown);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadVideos({ showLoading = false } = {}) {
+      if (showLoading) {
+        setLoading(true);
+      }
+
+      try {
+        const { data } = await api.get("/videos");
+
+        if (!mounted) {
+          return;
+        }
+
         setVideos(data.videos);
-        setActiveVideoId(data.videos[0]?.id || null);
-      })
-      .catch(() => setError("Could not load videos"))
-      .finally(() => setLoading(false));
+        setActiveVideoId((current) => current || data.videos[0]?.id || null);
+        setError("");
+      } catch {
+        if (mounted) {
+          setError("Could not load videos");
+        }
+      } finally {
+        if (mounted && showLoading) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadVideos({ showLoading: true });
+    const refreshTimer = window.setInterval(() => loadVideos(), 3000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -36,18 +76,21 @@ export function FeedPage() {
       return undefined;
     }
 
-    const ratios = new Map();
-    const cards = [...container.querySelectorAll("[data-video-card]")];
-
-    const selectMostVisible = () => {
-      let nextActiveId = activeVideoId || videos[0]?.id;
-      let bestRatio = 0;
+    let frameId = 0;
+    const selectCenteredVideo = () => {
+      const cards = [...container.querySelectorAll("[data-video-card]")];
+      const containerRect = container.getBoundingClientRect();
+      const centerY = containerRect.top + containerRect.height / 2;
+      let nextActiveId = videos[0]?.id || null;
+      let bestDistance = Number.POSITIVE_INFINITY;
 
       for (const card of cards) {
-        const ratio = ratios.get(card.dataset.videoId) || 0;
+        const rect = card.getBoundingClientRect();
+        const cardCenterY = rect.top + rect.height / 2;
+        const distance = Math.abs(cardCenterY - centerY);
 
-        if (ratio > bestRatio) {
-          bestRatio = ratio;
+        if (distance < bestDistance) {
+          bestDistance = distance;
           nextActiveId = card.dataset.videoId;
         }
       }
@@ -57,20 +100,21 @@ export function FeedPage() {
       }
     };
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          ratios.set(entry.target.dataset.videoId, entry.intersectionRatio);
-        }
+    const scheduleSelection = () => {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(selectCenteredVideo);
+    };
 
-        selectMostVisible();
-      },
-      { root: container, threshold: [0, 0.25, 0.5, 0.75, 1] }
-    );
+    selectCenteredVideo();
+    container.addEventListener("scroll", scheduleSelection, { passive: true });
+    window.addEventListener("resize", scheduleSelection);
 
-    cards.forEach((card) => observer.observe(card));
-    return () => observer.disconnect();
-  }, [activeVideoId, videos]);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      container.removeEventListener("scroll", scheduleSelection);
+      window.removeEventListener("resize", scheduleSelection);
+    };
+  }, [videos]);
 
   function updateVideo(id, patch) {
     setVideos((current) =>
@@ -81,13 +125,30 @@ export function FeedPage() {
   return (
     <main className="feed-shell">
       <header className="topbar">
-        <Link className="brand" to="/">
-          Skillcase Shorts
+        <Link className="brand" to="/feed">
+          <span className="brand-mark">S</span>
+          <span>Skillcase Shorts</span>
         </Link>
         <nav>
-          <Link className="icon-button" to="/new" aria-label="Add video" title="Add video">
-            <Plus size={19} />
-          </Link>
+          {user && (
+            <div className="account-menu-wrap" ref={accountMenuRef}>
+              <button
+                className="avatar-button"
+                onClick={() => setAccountOpen((current) => !current)}
+                aria-label="Open account menu"
+                aria-expanded={accountOpen}
+                title={user.email}
+              >
+                {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "U"}
+              </button>
+              {accountOpen && (
+                <div className="account-popover">
+                  <strong>{user.name}</strong>
+                  <span>{user.email}</span>
+                </div>
+              )}
+            </div>
+          )}
           {user ? (
             <button className="icon-button" onClick={() => dispatch(logout())} aria-label="Logout" title="Logout">
               <LogOut size={19} />
@@ -100,7 +161,24 @@ export function FeedPage() {
         </nav>
       </header>
 
-      {loading && <div className="center-state">Loading shorts...</div>}
+      {loading && (
+        <div className="feed-shimmer" aria-label="Loading shorts">
+          <div className="shimmer-phone">
+            <div className="shimmer-top" />
+            <div className="shimmer-copy">
+              <div className="shimmer-pill shimmer" />
+              <div className="shimmer-title shimmer" />
+              <div className="shimmer-line shimmer" />
+              <div className="shimmer-line short shimmer" />
+            </div>
+            <div className="shimmer-actions">
+              <span className="shimmer-circle shimmer" />
+              <span className="shimmer-circle shimmer" />
+              <span className="shimmer-circle shimmer" />
+            </div>
+          </div>
+        </div>
+      )}
       {error && <div className="center-state error-text">{error}</div>}
       {!loading && !error && videos.length === 0 && (
         <div className="center-state">Add videos from the backend to start the feed.</div>

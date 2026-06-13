@@ -37,7 +37,8 @@ export async function createCommentHandler(req, res) {
   const comment = await createComment(
     req.validated.params.id,
     req.user.id,
-    req.validated.body.content
+    req.validated.body.content,
+    req.validated.body.parent_id || null
   );
   res.status(201).json({ comment });
 }

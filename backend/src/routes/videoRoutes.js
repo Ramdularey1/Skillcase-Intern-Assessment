@@ -10,7 +10,7 @@ import {
   likeVideoHandler
 } from "../controllers/videoController.js";
 import { asyncHandler } from "../middlewares/asyncHandler.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { authMiddleware, optionalAuthMiddleware } from "../middlewares/authMiddleware.js";
 import { validate } from "../middlewares/validate.js";
 
 const router = Router();
@@ -32,13 +32,14 @@ const createVideoSchema = z.object({
 
 const commentSchema = idParams.extend({
   body: z.object({
-    content: z.string().min(1, "Comment cannot be empty").max(500)
+    content: z.string().min(1, "Comment cannot be empty").max(500),
+    parent_id: z.string().uuid("Parent comment id must be a valid UUID").optional().nullable()
   })
 });
 
 router.post("/", authMiddleware, validate(createVideoSchema), asyncHandler(createVideoHandler));
-router.get("/", asyncHandler(getVideosHandler));
-router.get("/:id", validate(idParams), asyncHandler(getVideoHandler));
+router.get("/", optionalAuthMiddleware, asyncHandler(getVideosHandler));
+router.get("/:id", optionalAuthMiddleware, validate(idParams), asyncHandler(getVideoHandler));
 router.post("/:id/like", authMiddleware, validate(idParams), asyncHandler(likeVideoHandler));
 router.post(
   "/:id/bookmark",

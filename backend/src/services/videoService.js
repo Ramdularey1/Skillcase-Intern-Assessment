@@ -84,46 +84,90 @@ export async function likeVideo(videoId, userId) {
 }
 
 export async function bookmarkVideo(videoId, userId) {
+  const client = await pool.connect();
+
+  try {
+    await client.query("begin");
+
+    const video = await client.query("select id from videos where id = $1", [videoId]);
+
+    if (!video.rows[0]) {
+      throw new AppError("Video not found", 404);
+    }
+
+    const removed = await client.query(
+      "delete from bookmarks where user_id = $1 and video_id = $2 returning user_id",
+      [userId, videoId]
+    );
+
+    if (removed.rowCount === 1) {
+      await client.query("commit");
+      return { bookmarked: false };
+    }
+
+    await client.query(
+      `insert into bookmarks (user_id, video_id)
+       values ($1, $2)`,
+      [userId, videoId]
+    );
+
+    await client.query("commit");
+    return { bookmarked: true };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function createComment(videoId, userId, content, parentId = null) {
   const video = await query("select id from videos where id = $1", [videoId]);
 
   if (!video.rows[0]) {
     throw new AppError("Video not found", 404);
   }
 
-  const { rowCount } = await query(
-    `insert into bookmarks (user_id, video_id)
-     values ($1, $2)
-     on conflict do nothing`,
-    [userId, videoId]
-  );
+  if (parentId) {
+    const parent = await query("select id from comments where id = $1 and video_id = $2", [
+      parentId,
+      videoId
+    ]);
 
-  return { bookmarked: true, alreadyBookmarked: rowCount === 0 };
-}
-
-export async function createComment(videoId, userId, content) {
-  const video = await query("select id from videos where id = $1", [videoId]);
-
-  if (!video.rows[0]) {
-    throw new AppError("Video not found", 404);
+    if (!parent.rows[0]) {
+      throw new AppError("Parent comment not found", 404);
+    }
   }
 
   const { rows } = await query(
-    `insert into comments (user_id, video_id, content)
-     values ($1, $2, $3)
+    `insert into comments (user_id, video_id, parent_id, content)
+     values ($1, $2, $3, $4)
      returning *`,
-    [userId, videoId, content]
+    [userId, videoId, parentId, content]
   );
   return rows[0];
 }
 
 export async function getComments(videoId) {
   const { rows } = await query(
-    `select c.id, c.content, c.created_at, u.id as user_id, u.name as user_name
+    `select c.id, c.parent_id, c.content, c.created_at, u.id as user_id, u.name as user_name
      from comments c
      join app_users u on u.id = c.user_id
      where c.video_id = $1
-     order by c.created_at desc`,
+     order by c.created_at asc`,
     [videoId]
   );
-  return rows;
+
+  const commentsById = new Map(rows.map((comment) => [comment.id, { ...comment, replies: [] }]));
+  const roots = [];
+
+  for (const comment of commentsById.values()) {
+    if (comment.parent_id && commentsById.has(comment.parent_id)) {
+      commentsById.get(comment.parent_id).replies.push(comment);
+    } else {
+      roots.push(comment);
+    }
+  }
+
+  return roots.reverse();
 }

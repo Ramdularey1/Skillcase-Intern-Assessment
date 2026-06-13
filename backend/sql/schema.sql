@@ -32,11 +32,14 @@ create table if not exists comments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references app_users(id) on delete cascade,
   video_id uuid not null references videos(id) on delete cascade,
+  parent_id uuid references comments(id) on delete cascade,
   content text not null,
   created_at timestamptz not null default now()
 );
 
+alter table comments add column if not exists parent_id uuid references comments(id) on delete cascade;
 create index if not exists idx_comments_video_created_at on comments (video_id, created_at desc);
+create index if not exists idx_comments_parent_id on comments (parent_id);
 
 create table if not exists bookmarks (
   user_id uuid not null references app_users(id) on delete cascade,

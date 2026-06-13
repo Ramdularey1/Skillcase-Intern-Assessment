@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { login, register } from "../redux/authSlice";
 
 export function AuthPage({ mode }) {
   const isRegister = mode === "register";
   const dispatch = useDispatch();
-  const location = useLocation();
+  const navigate = useNavigate();
   const { user, loading, error } = useSelector((state) => state.auth);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/feed" replace />;
   }
 
   async function handleSubmit(event) {
@@ -20,8 +20,8 @@ export function AuthPage({ mode }) {
     const payload = isRegister ? form : { email: form.email, password: form.password };
     const result = await dispatch(action(payload));
 
-    if (result.meta.requestStatus === "fulfilled" && location.state?.from) {
-      return <Navigate to={location.state.from} replace />;
+    if (result.meta.requestStatus === "fulfilled") {
+      navigate(isRegister ? "/login" : "/feed", { replace: true });
     }
   }
 

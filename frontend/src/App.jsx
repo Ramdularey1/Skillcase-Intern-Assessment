@@ -6,6 +6,16 @@ import { FeedPage } from "./pages/FeedPage";
 import { NewVideoPage } from "./pages/NewVideoPage";
 import { fetchMe } from "./redux/authSlice";
 
+function ProtectedRoute({ children }) {
+  const { user, token } = useSelector((state) => state.auth);
+
+  if (!token || !user) {
+    return <Navigate to="/register" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
@@ -19,11 +29,26 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<FeedPage />} />
-        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route path="/" element={<Navigate to="/register" replace />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
-        <Route path="/new" element={<NewVideoPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/login" element={<AuthPage mode="login" />} />
+        <Route
+          path="/feed"
+          element={
+            <ProtectedRoute>
+              <FeedPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/new"
+          element={
+            <ProtectedRoute>
+              <NewVideoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/register" replace />} />
       </Routes>
     </BrowserRouter>
   );
