@@ -4,4 +4,6 @@ dist/
 .DS_Store
 backend/uploads/*
 !backend/uploads/.gitkeep
+frontend/src/video/*
+!frontend/src/video/.gitkeep
 npm-debug.log*

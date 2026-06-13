@@ -1,10 +1,77 @@
 import { motion } from "framer-motion";
-import { Bookmark, Heart, MessageCircle } from "lucide-react";
+import { Bookmark, Heart, MessageCircle, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { API_URL, api } from "../api/client";
-import { useInViewVideo } from "../hooks/useInViewVideo";
 
-export function VideoCard({ video, onComment, onLocalUpdate }) {
-  const videoRef = useInViewVideo();
+export function VideoCard({ video, active, muted, onComment, onLocalUpdate, onToggleMute }) {
+  const [pausedByUser, setPausedByUser] = useState(false);
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    setPausedByUser(false);
+  }, [video.id]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    if (!active) {
+      element.pause();
+      element.currentTime = 0;
+      element.muted = true;
+      element.defaultMuted = true;
+      return;
+    }
+
+    element.muted = muted;
+    element.defaultMuted = muted;
+    element.volume = muted ? 0 : 1;
+
+    if (pausedByUser) {
+      element.pause();
+    } else {
+      element.play().catch(() => {});
+    }
+  }, [active, muted, pausedByUser]);
+
+  function handleToggleMute() {
+    const nextMuted = !muted;
+    const element = videoRef.current;
+
+    if (element && active) {
+      element.muted = nextMuted;
+      element.defaultMuted = nextMuted;
+      element.volume = nextMuted ? 0 : 1;
+
+      if (!nextMuted && !pausedByUser) {
+        element.play().catch(() => {});
+      }
+    }
+
+    onToggleMute(nextMuted);
+  }
+
+  function handleVideoClick() {
+    const element = videoRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    if (element.paused) {
+      setPausedByUser(false);
+      element.muted = muted;
+      element.defaultMuted = muted;
+      element.volume = muted ? 0 : 1;
+      element.play().catch(() => {});
+    } else {
+      setPausedByUser(true);
+      element.pause();
+    }
+  }
 
   async function handleLike() {
     if (video.liked_by_me) {
@@ -45,8 +112,8 @@ export function VideoCard({ video, onComment, onLocalUpdate }) {
     : `${API_URL}${video.file_path}`;
 
   return (
-    <section className="video-card">
-      <video ref={videoRef} className="short-video" src={src} muted loop playsInline preload="metadata" />
+    <section className="video-card" data-video-card data-video-id={video.id} onClick={handleVideoClick}>
+      <video ref={videoRef} className="short-video" src={src} muted={muted} loop playsInline preload="auto" />
       <div className="video-gradient" />
 
       <motion.div className="video-copy" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}>
@@ -55,7 +122,15 @@ export function VideoCard({ video, onComment, onLocalUpdate }) {
         <p>{video.description}</p>
       </motion.div>
 
-      <div className="action-stack">
+      <div className="action-stack" onClick={(event) => event.stopPropagation()}>
+        <button
+          className="round-action"
+          onClick={handleToggleMute}
+          aria-label={muted ? "Unmute video" : "Mute video"}
+          title={muted ? "Unmute" : "Mute"}
+        >
+          {muted ? <VolumeX size={23} /> : <Volume2 size={23} />}
+        </button>
         <button
           className={`round-action ${video.liked_by_me ? "active" : ""}`}
           onClick={handleLike}
