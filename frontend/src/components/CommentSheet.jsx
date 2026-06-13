@@ -101,7 +101,7 @@ export function CommentSheet({ open, video, onClose }) {
           >
             <div className="sheet-header">
               <div><h2>Comments</h2><span>{comments.length} threads</span></div>
-              <button className="icon-button" onClick={onClose} aria-label="Close comments">
+              <button className="icon-button sheet-close-button" onClick={onClose} aria-label="Close comments">
                 <X size={20} />
               </button>
             </div>

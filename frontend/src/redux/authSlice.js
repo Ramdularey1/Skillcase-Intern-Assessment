@@ -65,20 +65,28 @@ const authSlice = createSlice({
         localStorage.removeItem("user");
         localStorage.removeItem("token");
       })
+      .addCase(register.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+        state.error = null;
+        localStorage.setItem("hasRegistered", "true");
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      })
+      .addCase(login.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+        state.error = null;
+        localStorage.setItem("hasRegistered", "true");
+        persistAuth(action.payload);
+      })
       .addMatcher(
         (action) => ["auth/login/pending", "auth/register/pending"].includes(action.type),
         (state) => {
           state.loading = true;
           state.error = null;
-        }
-      )
-      .addMatcher(
-        (action) => ["auth/login/fulfilled", "auth/register/fulfilled"].includes(action.type),
-        (state, action) => {
-          state.loading = false;
-          state.user = action.payload.user;
-          state.token = action.payload.token;
-          persistAuth(action.payload);
         }
       )
       .addMatcher(

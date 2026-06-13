@@ -6,11 +6,25 @@ import { FeedPage } from "./pages/FeedPage";
 import { NewVideoPage } from "./pages/NewVideoPage";
 import { fetchMe } from "./redux/authSlice";
 
+function getAuthStartPath() {
+  return localStorage.getItem("hasRegistered") === "true" ? "/login" : "/register";
+}
+
+function AuthStartRedirect() {
+  const { user, token } = useSelector((state) => state.auth);
+
+  if (token && user) {
+    return <Navigate to="/feed" replace />;
+  }
+
+  return <Navigate to={getAuthStartPath()} replace />;
+}
+
 function ProtectedRoute({ children }) {
   const { user, token } = useSelector((state) => state.auth);
 
   if (!token || !user) {
-    return <Navigate to="/register" replace />;
+    return <Navigate to={getAuthStartPath()} replace />;
   }
 
   return children;
@@ -29,7 +43,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/register" replace />} />
+        <Route path="/" element={<AuthStartRedirect />} />
         <Route path="/register" element={<AuthPage mode="register" />} />
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route
@@ -48,7 +62,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/register" replace />} />
+        <Route path="*" element={<AuthStartRedirect />} />
       </Routes>
     </BrowserRouter>
   );
