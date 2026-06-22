@@ -67,6 +67,24 @@ JWT_EXPIRES_IN=7d
 CLIENT_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
+For Render deployment, use the Supabase **Transaction pooler** connection string, not the direct database URL. Render can fail to reach Supabase direct database hosts over IPv6 and show errors like `connect ENETUNREACH ... :5432`.
+
+In Supabase, copy it from:
+
+`Project Settings > Database > Connection string > Transaction pooler`
+
+It looks like:
+
+```bash
+DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@[REGION].pooler.supabase.com:6543/postgres
+```
+
+For this project, the username part should include the project ref:
+
+```bash
+postgres.bzcvzftpyojlyoxrwbma
+```
+
 Create frontend env:
 
 ```bash
