@@ -9,6 +9,7 @@ export async function registerUser({ name, email, password }) {
   const existing = await query("select id from app_users where email = $1", [email]);
   
 
+  
   if (existing.rows[0]) {
     throw new AppError("Email is already registered", 409);
   }
